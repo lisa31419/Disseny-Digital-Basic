@@ -1,0 +1,283 @@
+-- ENTITY NOT
+ENTITY inv IS
+PORT (a: IN BIT;
+      f: OUT BIT);
+END inv;
+
+----- ARQUITECTURA logicaretard
+ARCHITECTURE logica_retard OF inv IS
+BEGIN
+f <= not a AFTER 3 ns;
+END logica_retard;
+
+-------------------------------------------------------
+-- ENTITY AND2
+ENTITY and2 IS
+PORT (a,b: IN BIT;
+	f: OUT BIT);
+END and2;
+
+---- ARQUITECTURA logica_retard
+ARCHITECTURE logica_retard OF and2 IS
+BEGIN
+f <= a AND b AFTER 3 ns;
+END logica_retard;
+
+-------------------------------------------------------
+-- ENTITY AND3
+ENTITY and3 IS
+PORT (a,b,c: IN BIT;
+	  f: OUT BIT);
+END and3;
+
+---- ARQUITECTURA logica_retard
+ARCHITECTURE logica_retard OF and3 IS
+BEGIN
+f <= a AND b AND c AFTER 3 ns;
+END logica_retard;
+
+--------------------------------------------------------
+-- ENTITY NAND3
+ENTITY nand3 IS
+PORT (a,b,c: IN BIT;
+	  f: OUT BIT);
+END nand3;
+
+---- ARQUITECTURA logica_retard
+ARCHITECTURE logica_retard OF nand3 IS
+BEGIN
+f <= (NOT(NOT(a AND b) AND c)) AFTER 3 ns;
+END logica_retard;
+
+--------------------------------------------------------
+
+-- ENTITY OR2
+ENTITY or2 is
+PORT (a,b: IN BIT;
+	f: OUT BIT);
+END or2;
+
+----- ARQUITECTURA logica_retard
+ARCHITECTURE logica_retard OF or2 IS
+BEGIN
+f <= a OR b AFTER 3 ns; 
+END logica_retard;
+
+-----------------------------------------------------------
+
+---- Flip-Flop T per flanc de baixada amb Preset i Clear
+ENTITY T_Bajada_PreClr IS
+PORT(T, Clk, Pre, Clr: IN BIT;
+              Q, NOT_Q: OUT BIT);
+
+END T_Bajada_PreClr;
+
+ARCHITECTURE ifthen OF T_Bajada_PreClr IS
+SIGNAL qint: BIT;
+
+BEGIN
+
+PROCESS (T, Clk, Pre, Clr)
+BEGIN
+	IF Clr = '0' THEN qint <= '0' AFTER 2 ns;
+	ELSIF Pre='0' THEN qint <= '1' AFTER 2 ns;
+	ELSIF Clk'EVENT AND Clk = '0' THEN
+		IF T = '0' THEN qint <= qint AFTER 2 ns;
+		ELSIF T = '1' THEN qint <= NOT qint AFTER 2 ns;
+		END IF;
+
+	END IF;
+
+END PROCESS;
+
+Q <= qint;
+NOT_Q <= NOT qint;
+
+END ifthen;
+
+
+-------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------------
+
+
+---- ENTITY MULTIPLEXOR
+ENTITY mux2a1 is
+PORT ( a,b,s: IN BIT;
+	   f: OUT BIT);
+END mux2a1;
+
+----  ARQUITECTURA MULTIPLEXOR LOGICA_RETARD
+ARCHITECTURE logica_retard OF mux2a1 IS
+BEGIN
+f <= ((a AND (NOT s)) OR (b AND s))  AFTER 3 ns;
+
+END logica_retard;
+
+----  ARQUITECTURA MULTIPLEXOR IFTHEN
+ARCHITECTURE ifthen OF mux2a1 IS
+BEGIN
+	PROCESS (a, b, s)
+	BEGIN
+		IF s <= '0'  THEN
+		   f <= a AFTER 3 ns;
+
+		ELSIF s <= '1' THEN
+		   f <= b AFTER 3 ns;
+		
+		END IF;
+
+	END PROCESS;
+
+END ifthen;
+
+---- ARQUITECTURA ESTRUCTURAL
+ARCHITECTURE estructural OF mux2a1 IS
+
+---- PORTA AND2 ----
+COMPONENT portaand2 IS
+PORT(a,b: IN BIT; 
+       f: OUT BIT);
+END COMPONENT;
+
+---- PORTA NOT ----
+COMPONENT portainv IS
+PORT(a: IN BIT;
+     f: OUT BIT);
+END COMPONENT;
+
+---- PORTA OR2 ----
+COMPONENT portaor2 IS
+PORT(a,b: IN BIT;
+       f: OUT BIT);
+END COMPONENT;
+
+SIGNAL inv_s, and_as, and_bs, or_abs: BIT;
+	FOR DUT1: portainv USE ENTITY WORK.inv(logica_retard);
+	FOR DUT2: portaand2 USE ENTITY WORK.and2(logica_retard);
+	FOR DUT3: portaand2 USE ENTITY WORK.and2(logica_retard);
+	FOR DUT4: portaor2 USE ENTITY WORK.or2(logica_retard);
+
+BEGIN
+	DUT1: portainv PORT MAP (s, inv_s);
+	DUT2: portaand2 PORT MAP (a, inv_s, and_as);
+	DUT3: portaand2 PORT MAP (b,s, and_bs);
+	DUT4: portaor2 PORT MAP (and_as, and_bs, f);
+
+END estructural;
+------------------------------------------------------
+------------------------------------------------------
+---- ENTITY REGISTRE
+
+ENTITY circuit IS
+PORT (sel,Clk: IN BIT;
+   Q0,Q1,Q2: OUT BIT);
+
+END circuit;
+
+---- ANQUITECTURA ESTRUCTURAL
+ARCHITECTURE estructural OF circuit IS 
+
+---- MULTIPLEXOR ----
+COMPONENT multiplex IS
+PORT ( a,b,s: IN BIT;
+	   f: OUT BIT);
+END COMPONENT;
+
+---- FF_T BAIXADA ----
+
+COMPONENT FF_T_Baixada IS
+PORT(T, Clk, Pre, Clr: IN BIT; 
+	      Q,NOT_Q: OUT BIT);
+END COMPONENT;
+
+---- PORTA NAND3 ----
+COMPONENT portanand3 IS
+PORT(a,b,c: IN BIT;
+	 f: OUT BIT);
+END COMPONENT;
+-------------------------------------------------------------------------------
+
+SIGNAL T2, T1, T0, qint2, not_qint2, qint1, not_qint1, qint0, not_qint0, alpha, beta,gamma: BIT;
+	FOR DUT1: multiplex USE ENTITY WORK.mux2a1(logica_retard);
+	FOR DUT2: multiplex USE ENTITY WORK.mux2a1(ifthen);
+	FOR DUT3: multiplex USE ENTITY WORK.mux2a1(estructural);
+
+	FOR DUT4: FF_T_Baixada USE ENTITY WORK.T_Bajada_PreClr(ifthen);
+	FOR DUT5: FF_T_Baixada USE ENTITY WORK.T_Bajada_PreClr(ifthen);
+	FOR DUT6: FF_T_Baixada USE ENTITY WORK.T_Bajada_PreClr(ifthen);
+
+	FOR DUT7: portanand3 USE ENTITY WORK.nand3(logica_retard);
+	FOR DUT8: portanand3 USE ENTITY WORK.nand3(logica_retard);
+        FOR DUT9: portanand3 USE ENTITY WORK.nand3(logica_retard);
+
+BEGIN
+	DUT1: multiplex PORT MAP ('1','0',sel,T0);
+	DUT2: multiplex PORT MAP ('1','0',sel,T1);
+	DUT3: multiplex PORT MAP ('1','0',sel,T2);
+	
+	
+	
+	DUT7: portanand3 PORT MAP ('0','1','0',alpha); 
+
+	DUT4: FF_T_Baixada PORT MAP (T0,Clk,'1',alpha,qint0,not_qint0);
+        DUT8: portanand3 PORT MAP (qint0,'1','0',beta); 
+	DUT5: FF_T_Baixada PORT MAP (T1,not_qint0,'1',beta,qint1,not_qint1);
+	DUT9: portanand3 PORT MAP (qint0,not_qint1,'0',gamma); 
+	DUT6: FF_T_Baixada PORT MAP (T2,not_qint1,'1',gamma,qint2,not_qint2);
+
+Q2 <= qint2;
+Q1 <= qint1;
+Q0 <= qint0;
+ 
+END estructural;
+
+-- Banc de Proves 
+ENTITY bdp IS
+END bdp;
+
+ARCHITECTURE test OF bdp IS
+
+COMPONENT bloc_que_simulem IS
+PORT (sel,Clk: IN BIT;
+     Q2,Q1,Q0: OUT BIT);
+END COMPONENT;
+
+
+SIGNAL sel,Clk,Q2,Q1,Q0: BIT;
+FOR DUT1: bloc_que_simulem USE ENTITY WORK.circuit(estructural);
+
+BEGIN
+	
+	DUT1: bloc_que_simulem PORT MAP(sel,Clk,Q2,Q1,Q0);
+	
+PROCESS (Clk)
+BEGIN
+Clk <= NOT Clk AFTER 50 ns;
+
+
+END PROCESS;
+
+PROCESS
+BEGIN
+---- CASOS -----
+-- 1.1 
+
+sel <= '1';
+WAIT FOR 150 ns;
+
+-- 2.1
+sel <= '0';
+WAIT FOR 150 ns;
+
+-- 1.2
+sel <= '1';
+WAIT FOR 150 ns;
+
+-- 2.2 
+sel <= '0';
+WAIT FOR 150 ns;
+
+END PROCESS;
+
+END test;
